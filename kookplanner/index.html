@@ -35,6 +35,13 @@
   }
   #app{max-width:480px;margin:0 auto;min-height:100vh;position:relative;padding-bottom:84px;}
 
+  .lockscreen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;max-width:480px;margin:0 auto;}
+  .lockbox{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:32px 28px;text-align:center;width:100%;box-shadow:0 4px 0 rgba(46,42,34,0.08);}
+  .lockicon{font-size:36px;margin-bottom:6px;}
+  .lockbox h1{font-family:'Caveat',cursive;font-size:32px;margin:0 0 6px;color:var(--pantry-dark);}
+  .lockbox p{font-size:13.5px;color:var(--ink-soft);margin:0 0 16px;}
+  .lockbox input{text-align:center;}
+
   .topbar{
     position:sticky;top:0;z-index:20;
     background:var(--pantry);
@@ -257,11 +264,29 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Kookplanner">
-<script src="storage-shim.js"></script>
 </head>
 <body>
 <div id="app"></div>
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBKwNXipIsV24YWZFzh18Ms8eFd-Gehin0",
+  authDomain: "jordy-kelly-kookplanner.firebaseapp.com",
+  projectId: "jordy-kelly-kookplanner",
+  storageBucket: "jordy-kelly-kookplanner.firebasestorage.app",
+  messagingSenderId: "289761929851",
+  appId: "1:289761929851:web:7ff7e8e2dacd6075ca10de"
+};
+const HOUSEHOLD_ID = "jordy-kelly";
+const APP_PASSWORD = "Fientje31!";
+
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+const db = getFirestore(fbApp);
+
 (function(){
   const CATEGORIES = ["Hoofdgerecht","Voorgerecht","BBQ","Bijgerecht","Lunch","Soep","Salade","Smeersel","Dessert"];
   const CATEGORY_GROUP = {
@@ -282,6 +307,9 @@
     voorraadDupError: null,
     weekplans: {},
     loading: true,
+    unlocked: (localStorage.getItem('kp_unlocked') === '1'),
+    passwordError: null,
+    authError: null,
     catFilter: 'Alle',
     matcherCatFilter: 'Alle',
     dateFilterOpen: false,
@@ -400,25 +428,61 @@
     return {title:'', category:CATEGORIES[0], prepTime:'', servings:'', lastMade:'', photo:null, components:[emptyComponent()]};
   }
 
-  async function loadAll(){
-    try{ const r = await window.storage.get('recipes'); state.recipes = r ? JSON.parse(r.value) : []; }
-    catch(e){ state.recipes = []; }
-    try{ const p = await window.storage.get('pantry'); state.pantry = p ? JSON.parse(p.value) : []; }
-    catch(e){ state.pantry = []; }
-    try{ const v = await window.storage.get('voorraadkast'); state.voorraadkast = v ? JSON.parse(v.value) : []; }
-    catch(e){ state.voorraadkast = []; }
-    try{ const w = await window.storage.get('weekplans'); state.weekplans = w ? JSON.parse(w.value) : {}; }
-    catch(e){ state.weekplans = {}; }
+  let recipesUnsub = null, weekplansUnsub = null, pantryUnsub = null, voorraadUnsub = null;
+  let firstRecipesSnapshot = true;
 
-    Object.values(state.weekplans).forEach(wp => { if(!Array.isArray(wp.ownedNames)) wp.ownedNames = []; });
+  function householdRef(...parts){ return doc(db, 'households', HOUSEHOLD_ID, ...parts); }
+  function householdCol(name){ return collection(db, 'households', HOUSEHOLD_ID, name); }
 
-    if(state.recipes.length === 0){
-      state.recipes = [seedRecipe()];
-      await saveRecipes();
+  async function startSync(){
+    try{
+      await new Promise((resolve, reject) => {
+        onAuthStateChanged(auth, (user) => { if(user) resolve(); }, reject);
+        signInAnonymously(auth).catch(reject);
+      });
+    }catch(e){
+      state.authError = 'Kon geen verbinding maken met de sync-server. Controleer je internetverbinding en probeer het opnieuw.';
+      state.loading = false;
+      render();
+      return;
     }
-    state.loading = false;
-    render();
+
+    recipesUnsub = onSnapshot(householdCol('recipes'), async (snap) => {
+      state.recipes = snap.docs.map(d => ({...d.data(), id: d.id}));
+      if(firstRecipesSnapshot){
+        firstRecipesSnapshot = false;
+        if(state.recipes.length === 0){
+          const seed = seedRecipe();
+          try{ await setDoc(householdRef('recipes', seed.id), seed); }catch(e){ console.error('seed opslaan mislukt', e); }
+        }
+      }
+      state.loading = false;
+      render();
+    }, (err) => { console.error('recepten sync-fout', err); state.authError = 'Synchroniseren van recepten mislukt.'; render(); });
+
+    pantryUnsub = onSnapshot(householdRef('meta','pantry'), (snap) => {
+      state.pantry = (snap.exists() && Array.isArray(snap.data().items)) ? snap.data().items : [];
+      render();
+    }, (err) => console.error('voorraad-in-huis sync-fout', err));
+
+    voorraadUnsub = onSnapshot(householdRef('meta','voorraadkast'), (snap) => {
+      state.voorraadkast = (snap.exists() && Array.isArray(snap.data().items)) ? snap.data().items : [];
+      render();
+    }, (err) => console.error('voorraadkast sync-fout', err));
+
+    weekplansUnsub = onSnapshot(householdCol('weekplans'), (snap) => {
+      const wp = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        if(!Array.isArray(data.ownedNames)) data.ownedNames = [];
+        if(!Array.isArray(data.items)) data.items = [];
+        wp[d.id] = data;
+      });
+      state.weekplans = wp;
+      render();
+    }, (err) => console.error('planning sync-fout', err));
   }
+
   function seedRecipe(){
     return {
       id: uid(),
@@ -475,10 +539,11 @@
     };
   }
 
-  async function saveRecipes(){ try{ await window.storage.set('recipes', JSON.stringify(state.recipes)); }catch(e){ console.error('opslaan mislukt', e); } }
-  async function savePantry(){ try{ await window.storage.set('pantry', JSON.stringify(state.pantry)); }catch(e){ console.error('opslaan mislukt', e); } }
-  async function saveVoorraadkast(){ try{ await window.storage.set('voorraadkast', JSON.stringify(state.voorraadkast)); }catch(e){ console.error('opslaan mislukt', e); } }
-  async function saveWeekplans(){ try{ await window.storage.set('weekplans', JSON.stringify(state.weekplans)); }catch(e){ console.error('opslaan mislukt', e); } }
+  async function saveRecipeDoc(recipe){ try{ await setDoc(householdRef('recipes', recipe.id), recipe); }catch(e){ console.error('opslaan mislukt', e); state.formError = 'Opslaan is niet gelukt — controleer je internetverbinding.'; render(); } }
+  async function deleteRecipeDoc(id){ try{ await deleteDoc(householdRef('recipes', id)); }catch(e){ console.error('verwijderen mislukt', e); } }
+  async function savePantry(){ try{ await setDoc(householdRef('meta','pantry'), {items: state.pantry}); }catch(e){ console.error('opslaan mislukt', e); } }
+  async function saveVoorraadkast(){ try{ await setDoc(householdRef('meta','voorraadkast'), {items: state.voorraadkast}); }catch(e){ console.error('opslaan mislukt', e); } }
+  async function saveWeekplanDoc(key){ try{ await setDoc(householdRef('weekplans', key), state.weekplans[key]); }catch(e){ console.error('opslaan mislukt', e); } }
 
   function compressImage(file){
     return new Promise((resolve, reject) => {
@@ -526,10 +591,25 @@ Tekst:
           messages: [{role:"user", content: prompt}]
         })
       });
-      const data = await resp.json();
+
+      let data;
+      try{ data = await resp.json(); }
+      catch(parseRespErr){ throw new Error(`Server gaf geen leesbaar antwoord (HTTP ${resp.status}).`); }
+
+      if(!resp.ok || data.type === 'error'){
+        const msg = data?.error?.message || `HTTP ${resp.status}`;
+        throw new Error(`API-fout: ${msg}`);
+      }
+
       const textOut = (data.content||[]).filter(b => b.type==='text').map(b => b.text).join('\n');
+      if(!textOut.trim()){
+        throw new Error('Claude gaf geen tekstantwoord terug (mogelijk gestopt door een tool-aanroep of leeg antwoord).');
+      }
       const clean = textOut.replace(/```json|```/g,'').trim();
-      const parsed = JSON.parse(clean);
+
+      let parsed;
+      try{ parsed = JSON.parse(clean); }
+      catch(jsonErr){ throw new Error(`Antwoord was geen geldige JSON (${jsonErr.message}). Eerste 120 tekens: "${clean.slice(0,120)}"`); }
 
       const draft = newDraft();
       draft.title = parsed.title || '';
@@ -550,7 +630,7 @@ Tekst:
       render();
     }catch(err){
       state.importLoading = false;
-      state.importError = 'Import mislukt — controleer of er genoeg tekst is geplakt en probeer het opnieuw.';
+      state.importError = 'Import mislukt — ' + (err && err.message ? err.message : 'onbekende fout') + '. Probeer het opnieuw of plak minder tekst.';
       render();
     }
   }
@@ -660,6 +740,14 @@ Tekst:
   // ---------- RENDER ----------
   function render(){
     const app = document.getElementById('app');
+    if(!state.unlocked){
+      app.innerHTML = renderLockScreen();
+      return;
+    }
+    if(state.authError){
+      app.innerHTML = `<div class="empty" style="padding-top:120px;"><span class="big">Kon niet verbinden</span>${escapeHtml(state.authError)}</div>`;
+      return;
+    }
     if(state.loading){
       app.innerHTML = `<div class="empty" style="padding-top:120px;"><span class="big">Kookplanner wordt geladen&hellip;</span></div>`;
       return;
@@ -700,6 +788,19 @@ Tekst:
       }
       state.focusAfterRender = null;
     }
+  }
+
+  function renderLockScreen(){
+    return `<div class="lockscreen">
+      <div class="lockbox">
+        <div class="lockicon">🔒</div>
+        <h1>Kookplanner</h1>
+        <p>Voer het wachtwoord in om verder te gaan.</p>
+        <input type="password" id="pwInput" placeholder="Wachtwoord" autofocus>
+        ${state.passwordError ? `<div class="import-error">${escapeHtml(state.passwordError)}</div>` : ''}
+        <button class="btn btn-primary btn-block" data-act="unlock" style="margin-top:12px;">Ontgrendelen</button>
+      </div>
+    </div>`;
   }
 
   function renderTopbar(){
@@ -1200,13 +1301,8 @@ Tekst:
         return;
       }
       state.formError = null;
-      if(state.formEditingId){
-        const idx = state.recipes.findIndex(x => x.id === state.formEditingId);
-        state.recipes[idx] = {...d, id: state.formEditingId};
-      } else {
-        state.recipes.push({...d, id: uid()});
-      }
-      await saveRecipes();
+      const recipe = {...d, id: state.formEditingId || uid()};
+      await saveRecipeDoc(recipe);
       state.formDraft = null; state.formEditingId = null;
       render();
     }
@@ -1215,17 +1311,31 @@ Tekst:
     else if(act === 'doconfirm'){
       if(state.confirm.action === 'restorebackup'){
         const data = state.pendingRestore;
-        state.recipes = Array.isArray(data.recipes) ? data.recipes : [];
-        state.pantry = Array.isArray(data.pantry) ? data.pantry : [];
-        state.voorraadkast = Array.isArray(data.voorraadkast) ? data.voorraadkast : [];
-        state.weekplans = (data.weekplans && typeof data.weekplans === 'object') ? data.weekplans : {};
-        Object.values(state.weekplans).forEach(wp => { if(!Array.isArray(wp.ownedNames)) wp.ownedNames = []; });
-        await saveRecipes(); await savePantry(); await saveVoorraadkast(); await saveWeekplans();
+        try{
+          const [existingRecipes, existingWeekplans] = await Promise.all([
+            getDocs(householdCol('recipes')), getDocs(householdCol('weekplans'))
+          ]);
+          await Promise.all(existingRecipes.docs.map(d => deleteDoc(d.ref)));
+          await Promise.all(existingWeekplans.docs.map(d => deleteDoc(d.ref)));
+
+          const newRecipes = Array.isArray(data.recipes) ? data.recipes : [];
+          const newPantry = Array.isArray(data.pantry) ? data.pantry : [];
+          const newVoorraadkast = Array.isArray(data.voorraadkast) ? data.voorraadkast : [];
+          const newWeekplans = (data.weekplans && typeof data.weekplans === 'object') ? data.weekplans : {};
+          Object.values(newWeekplans).forEach(wp => { if(!Array.isArray(wp.ownedNames)) wp.ownedNames = []; if(!Array.isArray(wp.items)) wp.items = []; });
+
+          await Promise.all(newRecipes.map(r => setDoc(householdRef('recipes', r.id), r)));
+          await Promise.all(Object.entries(newWeekplans).map(([key, wp]) => setDoc(householdRef('weekplans', key), wp)));
+          await setDoc(householdRef('meta','pantry'), {items: newPantry});
+          await setDoc(householdRef('meta','voorraadkast'), {items: newVoorraadkast});
+        }catch(e){
+          console.error('herstellen mislukt', e);
+          state.backupError = 'Herstellen is niet gelukt — controleer je internetverbinding en probeer het opnieuw.';
+        }
         state.pendingRestore = null;
         state.backupOpen = false;
       } else {
-        state.recipes = state.recipes.filter(x => x.id !== state.confirm.id);
-        await saveRecipes();
+        await deleteRecipeDoc(state.confirm.id);
         state.detailId = null;
       }
       state.confirm = null;
@@ -1244,14 +1354,15 @@ Tekst:
       const key = weekKeyFor(state.currentMonday);
       const wp = getWeekplan(key);
       wp.items.push({id: uid(), recipeId: el.dataset.id, kellyScore: null});
-      await saveWeekplans();
+      await saveWeekplanDoc(key);
       state.pickerOpen = false;
       render();
     }
     else if(act === 'rmplanitem'){
-      const wp = getWeekplan(el.dataset.key);
+      const key = el.dataset.key;
+      const wp = getWeekplan(key);
       wp.items = wp.items.filter(it => it.id !== el.dataset.itemid);
-      await saveWeekplans();
+      await saveWeekplanDoc(key);
       render();
     }
     else if(act === 'openimport'){ state.importOpen = true; state.importError = null; render(); }
@@ -1268,24 +1379,27 @@ Tekst:
       if(i>=0) state.expandedMonths.splice(i,1); else state.expandedMonths.push(mk);
       render();
     }
+    else if(act === 'unlock'){ tryUnlock(); }
   });
 
   document.addEventListener('change', async (e) => {
     const el = e.target;
     if(el.dataset.act === 'toggleweekowned'){
-      const wp = getWeekplan(el.dataset.key);
+      const key = el.dataset.key;
+      const wp = getWeekplan(key);
       const k = el.dataset.ingkey;
       if(el.checked){ if(!wp.ownedNames.includes(k)) wp.ownedNames.push(k); }
       else { wp.ownedNames = wp.ownedNames.filter(n => n !== k); }
-      await saveWeekplans();
+      await saveWeekplanDoc(key);
       render();
     }
     else if(el.dataset.act === 'setkelly'){
-      const wp = getWeekplan(el.dataset.key);
+      const key = el.dataset.key;
+      const wp = getWeekplan(key);
       const item = wp.items.find(it => it.id === el.dataset.itemid);
       let v = el.value === '' ? null : Math.max(0, Math.min(10, parseFloat(el.value)));
       item.kellyScore = v;
-      await saveWeekplans();
+      await saveWeekplanDoc(key);
       render();
     }
     else if(el.dataset.act === 'setdatefrom'){ state.dateFrom = el.value; render(); }
@@ -1326,7 +1440,25 @@ Tekst:
   document.addEventListener('keydown', (e) => {
     if(e.target && e.target.id === 'pantryInput' && e.key === 'Enter'){ e.preventDefault(); addPantryFromInput(); }
     if(e.target && e.target.id === 'voorraadInput' && e.key === 'Enter'){ e.preventDefault(); addVoorraadFromInput(); }
+    if(e.target && e.target.id === 'pwInput' && e.key === 'Enter'){ e.preventDefault(); tryUnlock(); }
   });
+
+  function tryUnlock(){
+    const input = document.getElementById('pwInput');
+    if(!input) return;
+    if(input.value === APP_PASSWORD){
+      localStorage.setItem('kp_unlocked', '1');
+      state.unlocked = true;
+      state.passwordError = null;
+      render();
+      startSync();
+    } else {
+      state.passwordError = 'Onjuist wachtwoord.';
+      render();
+      const again = document.getElementById('pwInput');
+      if(again) again.focus();
+    }
+  }
 
   async function addPantryFromInput(){
     const input = document.getElementById('pantryInput');
@@ -1362,7 +1494,7 @@ Tekst:
     if(again) again.focus();
   }
 
-  loadAll();
+  if(state.unlocked){ startSync(); } else { render(); }
 })();
 </script>
 <script>
