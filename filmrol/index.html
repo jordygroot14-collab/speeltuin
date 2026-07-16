@@ -1,26 +1,22 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-<title>Filmrol</title>
-<meta name="theme-color" content="#0a0a0a">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/icon-180.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Filmrol">
-<link rel="stylesheet" href="filmrol.css">
-<style>html, body, #root { min-height: 100vh; } body { margin: 0; background: #0a0a0a; }</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <title>Filmrol</title>
+  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Filmrol" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html, body, #root { height: 100%; margin: 0; background: #0a0a0a; }
+  </style>
 </head>
 <body>
-<div id="root"></div>
-<script src="storage-shim.js"></script>
-<script src="filmrol.js"></script>
-<script>
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" });
-</script>
+  <div id="root"></div>
+  <script src="./bundle.js"></script>
 </body>
 </html>
