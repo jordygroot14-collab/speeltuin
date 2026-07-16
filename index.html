@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Jordy's AI speeltuin</title>
+<meta name="theme-color" content="#151119">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Speeltuin">
+</head>
+<body>
+<!-- 🎟️ Jordy's AI speeltuin — hub naar gepubliceerde artifacts -->
+<style>
+  :root {
+    --bg: #151119;
+    --ink: #F2EEE8;
+    --muted: #9A91A6;
+    --ticket: #0C0B10;
+    --line: rgba(255,255,255,0.08);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    color: var(--ink);
+    font-family: -apple-system, system-ui, "Segoe UI", sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .glow-top {
+    position: fixed; inset: 0 0 auto 0; height: 340px; pointer-events: none;
+    background: radial-gradient(60% 100% at 50% 0%, rgba(120,72,190,0.28), transparent 70%);
+  }
+  .wrap {
+    position: relative;
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 56px 20px 72px;
+  }
+  .eyebrow {
+    font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600; margin-bottom: 14px;
+  }
+  h1 {
+    font-family: Didot, "Didot LT STD", "Bodoni MT", "Playfair Display", Georgia, serif;
+    font-weight: 400;
+    font-size: clamp(38px, 9vw, 52px);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    margin-bottom: 42px;
+  }
+  h1 em { font-style: italic; }
+
+  .tickets { display: flex; flex-direction: column; gap: 22px; }
+
+  .ticket {
+    position: relative;
+    display: flex;
+    text-decoration: none;
+    color: var(--ink);
+    border-radius: 18px;
+    transition: transform 0.25s ease, filter 0.25s ease;
+  }
+  .ticket:hover, .ticket:focus-visible { transform: translateY(-3px); }
+  .ticket:focus-visible { outline: 2px solid var(--ac); outline-offset: 3px; }
+
+  .ticket-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--ticket);
+    border: 1px solid var(--line);
+    border-right: none;
+    border-radius: 18px 0 0 18px;
+    padding: 26px 8px 26px 24px;
+    min-height: 148px;
+    overflow: hidden;
+    position: relative;
+  }
+  .ticket-body::after { /* zachte kleurwaas rechts, achter de illustratie */
+    content: "";
+    position: absolute; right: -30px; top: 50%; transform: translateY(-50%);
+    width: 190px; height: 190px; border-radius: 50%;
+    background: radial-gradient(circle, var(--ac-glow), transparent 68%);
+    opacity: 0.22; pointer-events: none;
+  }
+  .t-text { flex: 1; min-width: 0; position: relative; }
+  .t-name {
+    font-family: Didot, "Didot LT STD", "Bodoni MT", "Playfair Display", Georgia, serif;
+    font-weight: 400;
+    font-size: 27px;
+    letter-spacing: 0.01em;
+    margin-bottom: 7px;
+  }
+  .t-tag { color: var(--muted); font-size: 13.5px; line-height: 1.45; padding-right: 4px; }
+  .t-open {
+    display: inline-block; margin-top: 12px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--ac-soft);
+  }
+  .t-open::after { content: " →"; }
+
+  .t-art {
+    position: relative;
+    width: 104px; height: 104px; flex: none;
+    display: grid; place-items: center;
+  }
+  .t-art svg {
+    width: 92px; height: 92px;
+    filter: drop-shadow(0 0 16px var(--ac-glow)) drop-shadow(0 2px 6px rgba(0,0,0,0.6));
+    animation: floaty 5s ease-in-out infinite;
+  }
+  .ticket:nth-child(2) .t-art svg { animation-delay: 1.2s; }
+  .ticket:nth-child(3) .t-art svg { animation-delay: 2.4s; }
+  @keyframes floaty {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+
+  /* perforatie tussen body en stub */
+  .perf {
+    width: 0;
+    border-left: 2px dashed rgba(255,255,255,0.16);
+    position: relative;
+    background: var(--ticket);
+  }
+  .notch { /* uitgeknipte halve rondjes, in de kleur van de pagina */
+    position: absolute; left: -9px; width: 16px; height: 16px;
+    background: var(--bg); border-radius: 50%; z-index: 2;
+  }
+  .notch.top { top: -9px; }
+  .notch.bottom { bottom: -9px; }
+
+  .stub {
+    flex: none;
+    width: 58px;
+    background: var(--ac);
+    border-radius: 0 18px 18px 0;
+    display: grid; place-items: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .stub::before { /* subtiele sheen */
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(160deg, rgba(255,255,255,0.22), transparent 45%);
+  }
+  .stub span {
+    font-size: 11px; font-weight: 800; letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(0,0,0,0.72);
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+  }
+
+  footer {
+    margin-top: 46px; text-align: center;
+    color: var(--muted); font-size: 12px; letter-spacing: 0.04em;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .t-art svg { animation: none; }
+    .ticket, .ticket:hover { transition: none; transform: none; }
+  }
+  @media (max-width: 420px) {
+    .t-name { font-size: 23px; }
+    .t-art { width: 88px; height: 88px; }
+    .t-art svg { width: 78px; height: 78px; }
+    .ticket-body { padding-left: 18px; min-height: 136px; }
+  }
+</style>
+
+<div class="glow-top"></div>
+<div class="wrap">
+  <div class="eyebrow">Toegangskaarten voor</div>
+  <h1>Jordy's<br><em>AI&nbsp;speeltuin</em></h1>
+  <div class="tickets" id="tickets"></div>
+  <footer>Gebouwd met Claude · nieuwe attracties volgen</footer>
+</div>
+
+<script>
+  /* Nieuwe app toevoegen? Eén object erbij in deze lijst. */
+  const APPS = [
+    {
+      num: "Koken",
+      name: "Kookplanner",
+      tag: "Slim plannen, lekker eten",
+      url: "kookplanner/",
+      ac: "#1F8A4C", acSoft: "#7FDCA4", acGlow: "#4FD07E",
+      art: `
+        <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+          <defs>
+            <radialGradient id="g-chef" cx="35%" cy="28%" r="85%">
+              <stop offset="0%" stop-color="#B8F5CF"/>
+              <stop offset="55%" stop-color="#4FD07E"/>
+              <stop offset="100%" stop-color="#0F5A2F"/>
+            </radialGradient>
+          </defs>
+          <circle cx="33" cy="38" r="16" fill="url(#g-chef)"/>
+          <circle cx="50" cy="30" r="18" fill="url(#g-chef)"/>
+          <circle cx="67" cy="38" r="16" fill="url(#g-chef)"/>
+          <path d="M31 44 h38 v22 h-38 z" fill="url(#g-chef)"/>
+          <rect x="31" y="66" width="38" height="11" rx="4" fill="#0F5A2F"/>
+          <rect x="31" y="66" width="38" height="11" rx="4" fill="none" stroke="#7FDCA4" stroke-opacity="0.6" stroke-width="1.5"/>
+          <path d="M42 50 v12 M50 50 v12 M58 50 v12" stroke="#0F5A2F" stroke-opacity="0.45" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>`
+    },
+    {
+      num: "Films",
+      name: "Filmrol",
+      tag: "Van klassieker tot kaskraker",
+      url: "filmrol/",
+      ac: "#A81F34", acSoft: "#F0798A", acGlow: "#E24D5F",
+      art: `
+        <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+          <defs>
+            <radialGradient id="g-film" cx="38%" cy="32%" r="80%">
+              <stop offset="0%" stop-color="#F0798A"/>
+              <stop offset="55%" stop-color="#C22A41"/>
+              <stop offset="100%" stop-color="#6E101F"/>
+            </radialGradient>
+          </defs>
+          <circle cx="46" cy="50" r="34" fill="url(#g-film)"/>
+          <circle cx="46" cy="50" r="34" fill="none" stroke="#F5A3B0" stroke-opacity="0.5" stroke-width="1.5"/>
+          <circle cx="46" cy="50" r="6.5" fill="#1A0409"/>
+          <circle cx="46" cy="29.5" r="7.5" fill="#1A0409"/>
+          <circle cx="46" cy="70.5" r="7.5" fill="#1A0409"/>
+          <circle cx="25.5" cy="50" r="7.5" fill="#1A0409"/>
+          <circle cx="66.5" cy="50" r="7.5" fill="#1A0409"/>
+          <path d="M78 52 v26 c0 3 2 5 5 5 h8" fill="none" stroke="#F0798A" stroke-width="4" stroke-linecap="round"/>
+          <path d="M46 84 h32" stroke="#C22A41" stroke-width="4" stroke-linecap="round"/>
+        </svg>`
+    },
+    {
+      num: "Luisteren",
+      name: "Luistervink",
+      tag: "Oren open, wereld aan",
+      url: "luistervink/",
+      ac: "#F5A524", acSoft: "#FFD98A", acGlow: "#FFC85C",
+      art: `
+        <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+          <defs>
+            <radialGradient id="g-phones" cx="38%" cy="30%" r="85%">
+              <stop offset="0%" stop-color="#FFE3A6"/>
+              <stop offset="55%" stop-color="#F5A524"/>
+              <stop offset="100%" stop-color="#8A5406"/>
+            </radialGradient>
+          </defs>
+          <path d="M24 62 v-10 c0 -15 12 -27 26 -27 s26 12 26 27 v10"
+                fill="none" stroke="url(#g-phones)" stroke-width="7" stroke-linecap="round"/>
+          <rect x="18" y="58" width="15" height="24" rx="7" fill="url(#g-phones)"/>
+          <rect x="67" y="58" width="15" height="24" rx="7" fill="url(#g-phones)"/>
+          <rect x="18" y="58" width="15" height="24" rx="7" fill="none" stroke="#FFE3A6" stroke-opacity="0.5" stroke-width="1.5"/>
+          <rect x="67" y="58" width="15" height="24" rx="7" fill="none" stroke="#FFE3A6" stroke-opacity="0.5" stroke-width="1.5"/>
+          <path d="M43 70 v6 M50 66 v13 M57 69 v8" stroke="#FFC85C" stroke-width="3" stroke-linecap="round"/>
+        </svg>`
+    }
+  ];
+
+  const holder = document.getElementById("tickets");
+  holder.innerHTML = APPS.map(a => `
+    <a class="ticket" href="${a.url}"
+       style="--ac:${a.ac}; --ac-soft:${a.acSoft}; --ac-glow:${a.acGlow};"
+       aria-label="${a.name} openen — ${a.tag}">
+      <div class="ticket-body">
+        <div class="t-text">
+          <div class="t-name">${a.name}</div>
+          <div class="t-tag">${a.tag}</div>
+          <span class="t-open">Open</span>
+        </div>
+        <div class="t-art">${a.art}</div>
+      </div>
+      <div class="perf">
+        <span class="notch top"></span>
+        <span class="notch bottom"></span>
+      </div>
+      <div class="stub"><span>${a.num}</span></div>
+    </a>
+  `).join("");
+</script>
+
+<script>
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js", { scope: "./" });
+</script>
+</body>
+</html>
