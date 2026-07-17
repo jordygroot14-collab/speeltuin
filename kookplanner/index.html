@@ -33,9 +33,9 @@
     -webkit-font-smoothing:antialiased;
     min-height:100vh;
   }
-  #app{max-width:480px;margin:0 auto;min-height:100vh;position:relative;padding-bottom:84px;}
+  #app{max-width:480px;margin:0 auto;min-height:100vh;position:relative;padding-bottom:calc(84px + env(safe-area-inset-bottom));}
 
-  .lockscreen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;max-width:480px;margin:0 auto;}
+  .lockscreen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;padding-top:calc(24px + env(safe-area-inset-top));padding-bottom:calc(24px + env(safe-area-inset-bottom));max-width:480px;margin:0 auto;}
   .lockbox{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:32px 28px;text-align:center;width:100%;box-shadow:0 4px 0 rgba(46,42,34,0.08);}
   .lockicon{font-size:36px;margin-bottom:6px;}
   .lockbox h1{font-family:'Caveat',cursive;font-size:32px;margin:0 0 6px;color:var(--pantry-dark);}
@@ -47,9 +47,11 @@
     background:var(--pantry);
     color:var(--white);
     padding:18px 18px 14px;
+    padding-top:calc(18px + env(safe-area-inset-top));
     border-bottom:3px solid var(--pantry-dark);
     box-shadow:0 3px 0 rgba(0,0,0,0.08);
   }
+  .hublink{color:rgba(255,255,255,0.75);text-decoration:none;font-size:19px;flex:0 0 auto;margin-top:2px;}
   .topbar-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
   .topbar-actions{display:flex;gap:8px;flex:0 0 auto;}
   .importbtn{
@@ -76,6 +78,7 @@
     position:fixed;bottom:0;left:0;right:0;z-index:30;
     max-width:480px;margin:0 auto;display:flex;
     background:var(--pantry-dark);border-top:2px solid var(--pantry);
+    padding-bottom:env(safe-area-inset-bottom);
   }
   .tab{flex:1;text-align:center;padding:11px 4px 9px;color:#A9BFAB;background:none;border:none;
     font-family:'Work Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer;}
@@ -127,13 +130,14 @@
   .empty{text-align:center;padding:50px 20px;color:var(--ink-soft);font-family:'Work Sans',sans-serif;}
   .empty .big{font-family:'Caveat',cursive;font-size:26px;color:var(--pantry-dark);display:block;margin-bottom:6px;}
 
-  .fab{position:fixed;right:calc(50% - 240px + 18px);bottom:96px;z-index:25;width:54px;height:54px;border-radius:8px;
+  .fab{position:fixed;right:calc(50% - 240px + 18px);bottom:calc(96px + env(safe-area-inset-bottom));z-index:25;width:54px;height:54px;border-radius:8px;
     background:var(--stamp);color:var(--white);border:none;font-size:26px;font-weight:700;cursor:pointer;
     box-shadow:0 3px 8px rgba(0,0,0,0.25);transform:rotate(-3deg);}
   @media (max-width:520px){ .fab{right:18px;} }
 
   .overlay{position:fixed;inset:0;background:var(--paper);z-index:50;max-width:480px;margin:0 auto;overflow-y:auto;}
   .ov-header{position:sticky;top:0;background:var(--pantry);color:var(--white);padding:14px 16px;
+    padding-top:calc(14px + env(safe-area-inset-top));
     display:flex;align-items:center;gap:10px;z-index:5;}
   .ov-header button{background:rgba(255,255,255,0.15);border:none;color:var(--white);
     width:32px;height:32px;border-radius:6px;font-size:16px;cursor:pointer;}
@@ -170,9 +174,9 @@
 
   label{display:block;font-size:12px;font-weight:700;color:var(--pantry-dark);
     text-transform:uppercase;letter-spacing:0.5px;margin:14px 0 5px;}
-  input[type=text],input[type=number],input[type=date],select,textarea{
+  input[type=text],input[type=number],input[type=date],input[type=password],select,textarea{
     width:100%;padding:10px 11px;border:1.5px solid var(--line);border-radius:5px;
-    background:var(--card);font-family:'Work Sans',sans-serif;font-size:14.5px;color:var(--ink);
+    background:var(--card);font-family:'Work Sans',sans-serif;font-size:16px;color:var(--ink);
   }
   input:focus,select:focus,textarea:focus{outline:2px solid var(--pantry-light);outline-offset:1px;}
   .row2{display:flex;gap:10px;}
@@ -251,7 +255,7 @@
   .picker-item .cat-lbl{font-size:11px;color:var(--ink-soft);}
   .picker-item .time{margin-left:auto;font-size:11.5px;color:var(--ink-soft);flex:0 0 auto;}
 
-  .confirm-overlay{position:fixed;inset:0;background:rgba(46,42,34,0.55);z-index:60;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .confirm-overlay{position:fixed;inset:0;background:rgba(46,42,34,0.55);z-index:60;display:flex;align-items:center;justify-content:center;padding:20px;padding-top:calc(20px + env(safe-area-inset-top));padding-bottom:calc(20px + env(safe-area-inset-bottom));}
   .confirm-box{background:var(--card);border-radius:8px;padding:20px;max-width:340px;text-align:center;}
   .confirm-box p{font-size:14.5px;margin:0 0 16px;}
   .confirm-box .actionrow{margin-top:0;}
@@ -808,10 +812,13 @@ Tekst:
     const subs = {recepten:"Jordy & Kelly's receptenkast", matcher:"boodschappen in huis \u2192 beste match", planning:"plannen \u00b7 afvinken \u00b7 beoordelen"};
     return `<div class="topbar"><div class="topbar-row">
       <div><h1>${titles[state.view]}</h1><div class="sub">${subs[state.view]}</div></div>
-      ${state.view==='recepten' ? `<div class="topbar-actions">
+      <div class="topbar-actions">
+        ${state.view==='recepten' ? `
         <button class="importbtn" data-act="openbackup" aria-label="Back-up" title="Back-up (exporteren/herstellen)">💾</button>
         <button class="importbtn" data-act="openimport" aria-label="Recept importeren" title="Recept importeren">📥</button>
-      </div>` : ''}
+        ` : ''}
+        <a class="hublink" href="../" aria-label="Terug naar de speeltuin" title="Terug naar de speeltuin">🎟️</a>
+      </div>
     </div></div>`;
   }
   function renderTabbar(){
