@@ -1,19 +1,18 @@
-const CACHE = "kookplanner-v1";
-self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (e) => {
-  e.waitUntil(caches.keys()
-    .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
-    .then(() => self.clients.claim()));
+// Kill-switch service worker.
+// Doel: eventuele oude gecachete versies van de app opruimen en daarna
+// zelf niets meer cachen, zodat je altijd de laatste versie krijgt.
+
+self.addEventListener('install', () => {
+  self.skipWaiting();
 });
-self.addEventListener("fetch", (e) => {
-  if (e.request.method !== "GET") return;
-  e.respondWith(
-    fetch(e.request).then(res => {
-      if (res.ok && e.request.url.startsWith(self.location.origin)) {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
-      }
-      return res;
-    }).catch(() => caches.match(e.request))
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+      .then(() => self.clients.claim())
   );
 });
+
+// Geen fetch-handler: alle verzoeken gaan gewoon rechtstreeks naar het netwerk,
+// dus geen kans meer dat een oude versie uit de cache wordt geserveerd.
